@@ -7,4 +7,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_executable(temu
         src/main.cpp
         src/main.cpp
+        src/util.h
+        src/util.cpp
 )
