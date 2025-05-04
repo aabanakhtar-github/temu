@@ -9,4 +9,6 @@ add_executable(temu
         src/main.cpp
         src/util.h
         src/util.cpp
+        src/unix_wrappers.cpp
+        src/unix_wrappers.h
 )
