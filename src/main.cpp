@@ -27,6 +27,16 @@ std::vector<char*> makeCArgs(std::vector<std::string> &args)
 constexpr std::size_t PIPE_READ = 0;
 constexpr std::size_t PIPE_WRITE = 1;
 
+void execChildProcess()
+{
+
+}
+
+void execParentProcess()
+{
+
+}
+
 void eval(const std::string& input)
 {
     int stdout_pipe_fd[2];
@@ -114,6 +124,5 @@ void eval(const std::string& input)
 
 int main()
 {
-    signal(SIGPIPE, SIG_IGN);
     return repl();
 }
