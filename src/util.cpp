@@ -18,3 +18,16 @@ std::vector<std::string> splitString(const std::string& s, char delim)
 
     return args;
 }
+
+std::vector<char*> makeCArgs(const std::vector<std::string> &args)
+{
+    std::vector<char*> cargs;
+    cargs.reserve(args.size());
+    for (auto& arg : args)
+    {
+        cargs.push_back(const_cast<char*>(arg.c_str()));
+    }
+    // required by execvp
+    cargs.push_back(nullptr);
+    return cargs;
+}

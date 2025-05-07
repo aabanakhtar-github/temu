@@ -9,4 +9,5 @@ add_executable(temu
         src/main.cpp
         src/util.h
         src/util.cpp
+        src/pipe.h
 )

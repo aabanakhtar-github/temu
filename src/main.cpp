@@ -2,30 +2,10 @@
 #include <ranges>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/poll.h>
+
+#include "pipe.h"
 #include "util.h"
-
-enum OutputLevel
-{
-    ERROR,
-    INFO,
-    LOG
-};
-
-std::vector<char*> makeCArgs(std::vector<std::string> &args)
-{
-    std::vector<char*> cargs;
-    cargs.reserve(args.size());
-    for (auto& arg : args)
-    {
-        cargs.push_back(const_cast<char*>(arg.c_str()));
-    }
-    // required by execvp
-    cargs.push_back(nullptr);
-    return cargs;
-}
-
-constexpr std::size_t PIPE_READ = 0;
-constexpr std::size_t PIPE_WRITE = 1;
 
 void execChildProcess()
 {
@@ -37,20 +17,6 @@ void execParentProcess()
 
 }
 
-void closePipe(int pipe[2])
-{
-    close(pipe[PIPE_READ]);
-    close(pipe[PIPE_WRITE]);
-}
-
-void redirect(const int pipe, const std::vector<int>& fds)
-{
-    for (const auto fd : fds)
-    {
-        dup2(pipe, fd);
-    }
-    close(pipe);
-}
 
 void eval(const std::string& input)
 {
@@ -88,6 +54,8 @@ void eval(const std::string& input)
         close(stdin_pipe_fd[PIPE_WRITE]);
         redirect(stdout_pipe_fd[PIPE_WRITE], {STDOUT_FILENO, STDERR_FILENO});
         redirect(stdin_pipe_fd[PIPE_READ], {STDIN_FILENO});
+        close(stdout_pipe_fd[PIPE_WRITE]);
+        close(stdin_pipe_fd[PIPE_READ]);
 
         execvp(args[0].c_str(), makeCArgs(args).data());
         perror("execvp");
@@ -101,18 +69,43 @@ void eval(const std::string& input)
         close(stdout_pipe_fd[PIPE_WRITE]);
         close(stdin_pipe_fd[PIPE_READ]);
 
-        // handle input
-        std::string test;
-        std::getline(std::cin, test);
-        write(stdin_pipe_fd[PIPE_WRITE], test.c_str(), test.size());
-        close(stdin_pipe_fd[PIPE_WRITE]);
+        pollfd poll_fds[2] = {{}, {}};
+        poll_fds[0].events = POLLIN; // poll child stdout
+        poll_fds[0].fd = stdout_pipe_fd[PIPE_READ];
+        poll_fds[1].events = POLLIN; // poll our stdin
+        poll_fds[1].fd = STDIN_FILENO;
 
-        char buffer[4096];
-        ssize_t sz;
-        while ((sz = read(stdout_pipe_fd[PIPE_READ], buffer, 4096)) > 0)
+        while (true)
         {
-            buffer[sz] = '\0';
-            std::cout << buffer << std::flush;
+            if (int res = poll(poll_fds, 2, -1); res == -1)
+            {
+                std::cout << "poll failed" << std::endl;
+                perror("poll");
+                break;
+            }
+
+            // handle stdout from child
+            if (poll_fds[0].revents & POLLIN)
+            {
+                char buf[4096];
+                // read while we can
+                ssize_t buffer_size;
+                while ((buffer_size = read(poll_fds[0].fd, buf, sizeof(buf))) > 0)
+                {
+                    // null terminate it
+                    buf[buffer_size] = '\0';
+                    std::cout << buf;
+                }
+                // closed by client
+                if (buffer_size == 0)
+                {
+                   break;
+                }
+                else if (buffer_size == -1)
+                {
+                    perror("failed to read child stdout");
+                }
+            }
         }
 
         close(stdout_pipe_fd[PIPE_READ]);

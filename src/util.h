@@ -7,5 +7,5 @@
 #include <vector>
 
 std::vector<std::string> splitString(const std::string& s, char delim);
-
+std::vector<char*> makeCArgs(const std::vector<std::string>& args);
 #endif //UTIL_H
