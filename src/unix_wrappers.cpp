@@ -4,6 +4,7 @@
 
 #include "unix_wrappers.h"
 
+
 Pipe::Pipe()
     : read(), write()
 {

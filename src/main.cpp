@@ -3,20 +3,118 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/poll.h>
-
+#include <pty.h>
+#include <fcntl.h>
 #include "pipe.h"
 #include "util.h"
 
 void execChildProcess()
 {
-
 }
 
 void execParentProcess()
 {
-
 }
 
+void evalWithPTY(const std::string& input)
+{
+    int master_fd;
+    int proc_ID = forkpty(&master_fd, nullptr, nullptr, nullptr);
+    if (proc_ID == -1)
+    {
+        perror("forkpty");
+        exit(EXIT_FAILURE);
+    }
+    else if (proc_ID == 0)
+    {
+        // child process
+        close(master_fd);
+
+        auto args = makeCArgs(splitString(input, ' '));
+        execvp(args[0], args.data());
+        // execvp should never return
+        perror("execvp");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        // parent process
+
+        const int flags = fcntl(master_fd, F_GETFL, 0);
+        fcntl(master_fd, F_SETFL, flags | O_NONBLOCK);
+        pollfd poll_fd{};
+        poll_fd.fd = master_fd;
+        poll_fd.events = POLLIN | POLLOUT; // for stdout from the proc
+
+        while (true)
+        {
+            // break if the process is done.
+            int status;
+            if (const int pid = waitpid(proc_ID, &status, WNOHANG); pid == proc_ID)
+            {
+                // child exited;
+                break;
+            }
+
+            if (poll(&poll_fd, 1, -1) == -1)
+            {
+                perror("poll");
+                exit(EXIT_FAILURE);
+            }
+
+            // read stdout from the program and print it
+            if (poll_fd.revents & POLLIN)
+            {
+                char buf[4096];
+                ssize_t buffer_size;
+                // read the stdout
+                while ((buffer_size = read(poll_fd.fd, &buf, sizeof(buf))) > 0)
+                {
+                    buf[buffer_size] = 0;
+                    for (ssize_t i = 0; i < buffer_size; ++i) {
+                        std::cout << "Char [" << buf[i] << "] ";
+                    }
+                    std::cout << buf;
+                }
+
+                // signal EOF, close the app
+                if (buffer_size == 0)
+                {
+                    break;
+                }
+                // problem occurred when reading stdout
+                if (buffer_size == -1)
+                {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EIO)
+                    {
+                        // Nothing to read now — fine, continue polling
+                        continue;
+                    }
+                    else
+                    {
+                        perror("read");
+                        break;
+                    }
+                }
+            }
+        }
+
+        close(master_fd);
+
+        int status;
+        wait(&status);
+
+        if (WIFEXITED(status))
+        {
+            const int code = WEXITSTATUS(status);
+            std::cout << "\nExited with status: " << code << std::endl;
+        }
+        else if (WIFSIGNALED(status))
+        {
+            std::cout << "\nKilled by signal: " << WTERMSIG(status) << std::endl;
+        }
+    }
+}
 
 void eval(const std::string& input)
 {
@@ -99,7 +197,7 @@ void eval(const std::string& input)
                 // closed by client
                 if (buffer_size == 0)
                 {
-                   break;
+                    break;
                 }
                 else if (buffer_size == -1)
                 {
@@ -133,7 +231,7 @@ void eval(const std::string& input)
         std::cout << "temu % ";
         std::string input;
         std::getline(std::cin, input);
-        eval(input);
+        evalWithPTY(input);
     }
 }
 
