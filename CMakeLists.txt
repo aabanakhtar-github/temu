@@ -11,4 +11,8 @@ add_executable(temu
         src/util.cpp
         src/pipe.h
         src/temu_core.h
+        src/temu_core.cpp
+        src/temu_runner.cpp
+        src/temu_runner.h
+        src/syscall.h
 )
