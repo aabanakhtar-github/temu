@@ -2,6 +2,7 @@
   <dictionary name="project">
     <words>
       <w>forkpty</w>
+      <w>getcwd</w>
     </words>
   </dictionary>
 </component>

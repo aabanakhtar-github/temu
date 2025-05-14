@@ -105,7 +105,7 @@ namespace temu
     void runChildProcess(const std::string& args)
     {
         auto shell_command = "\bin\bash -c " + args;
-        const auto input_vec = splitString(args, '_');
+        const auto input_vec = splitString(args, ' ');
         const auto argv = makeCArgs(input_vec);
         // run the app
         execvp((input_vec[0]).c_str(), argv.data());
@@ -114,15 +114,48 @@ namespace temu
         exit(EXIT_FAILURE);
     }
 
-    void readChildStdout()
-    {
-    }
 
-    void handleStdin()
+    bool interceptBuiltins(const std::string& input, bool& out_exit, bool& out_clear)
     {
-    }
+        if (input == "exit")
+        {
+            out_exit = true;
+            return true;
+        }
+        // check for emtpy string
+        auto copy = input;
+        if (copy.empty())
+        {
+            // nothing to parse
+            return false;
+        }
+        // handle more complex builtins
+        auto argv = splitString(copy, ' ');
+        std::for_each(argv.begin(), argv.end(), [&](auto& elem)
+        {
+            std::erase_if(elem, ::isspace);
+        });
+        if (argv[0] == "cd")
+        {
+            if (!(argv.size() == 2))
+            {
+                std::cout << "Usage: cd <path>" << std::endl;
+                return true;
+            }
+            // dir change
+            if (SYSCALL(chdir(argv[1].c_str())) == ENOTDIR)
+            {
+                std::cout << "Path is not a directory." << std::endl;
+            }
 
-    void handleExit()
-    {
+            return true;
+        }
+        else if (argv[0] == "clear")
+        {
+            out_clear = true;
+            return true;
+        }
+
+        return false;
     }
 }

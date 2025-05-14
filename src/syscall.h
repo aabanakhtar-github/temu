@@ -21,7 +21,6 @@ auto __res = (expr);                            \
 if (__res == -1) {                              \
 std::fprintf(stderr, "%s failed: %s\n",     \
 #expr, std::strerror(errno));  \
-std::exit(EXIT_FAILURE);                    \
 }                                               \
 return __res;                                   \
 })()

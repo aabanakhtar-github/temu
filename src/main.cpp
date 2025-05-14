@@ -9,6 +9,10 @@
 #include "syscall.h"
 #include "temu_core.h"
 #include "util.h"
+#include <cstdio>
+#include <memory>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 
 void evalWithPTY(const std::string& input)
@@ -37,22 +41,15 @@ void evalWithPTY(const std::string& input)
     {
         // parent process
         temu::Piper piper(master_fd);
-        temu::ExitHandler handler(proc_ID);
-        while (true)
+        for (;;)
         {
             int status;
             // see if the proc is done
-            int pid = SYSCALL(waitpid(proc_ID, &status, WNOHANG));
-            if (pid == proc_id)
+            if (const int pid = SYSCALL(waitpid(proc_ID, &status, WNOHANG)); pid == proc_ID)
             {
                 break;
             }
 
-            // break if the process is done.
-            if (handler.checkForExit())
-            {
-                break;
-            }
             // reroute stdin/out
             if (piper.pipeInputs())
             {
@@ -63,7 +60,7 @@ void evalWithPTY(const std::string& input)
         SYSCALL(close(master_fd));
 
         int status;
-        SYSCALL(wait(&status));
+        wait(&status);
 
         if (WIFEXITED(status))
         {
@@ -78,14 +75,45 @@ void evalWithPTY(const std::string& input)
     }
 }
 
-[[noreturn]] int repl()
+int repl()
 {
     for (;;)
     {
-        std::cout << "temu % ";
-        std::string input;
-        std::getline(std::cin, input);
-        evalWithPTY(input);
+        char buf[PATH_MAX];
+        if (getcwd(buf, PATH_MAX) == nullptr)
+        {
+            std::cout << "Couldn't determine current directory." << std::endl;
+            perror("getcwd");
+            exit(EXIT_FAILURE);
+        }
+
+        std::string prompt = (std::string("temu [")  + buf + "] % ");
+        char* input = readline(prompt.c_str());
+        if (input == nullptr)
+        {
+            continue;
+        }
+
+        add_history(input);
+        auto free_str = [](char* str) { free(str); };
+        std::unique_ptr<char, decltype(free_str)> input_deleter(input, free_str);
+        bool should_exit = false, should_clear = false;
+
+        if (!temu::interceptBuiltins(input, should_exit, should_clear))
+        {
+            evalWithPTY(input);
+        }
+
+        if (should_exit)
+        {
+            std::cout << "exiting" << std::endl;
+            return 0;
+        }
+
+        if (should_clear)
+        {
+            SYSCALL(system("clear"));
+        }
     }
 }
 
