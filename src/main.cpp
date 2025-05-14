@@ -15,6 +15,53 @@
 #include <readline/history.h>
 
 
+void child(const int master_fd, const std::string& input)
+{
+    // establish the terminal state
+    temu::TerminalState state;
+    // child process
+    // we don't need the master fd, handle directly with stdin stdout
+    close(master_fd);
+    temu::runChildProcess(input);
+}
+
+void parent(const int master_fd, const int proc_ID)
+{
+    // parent process
+    temu::Piper piper(master_fd);
+    for (;;)
+    {
+        int status;
+        // see if the proc is done
+        if (const int pid = SYSCALL(waitpid(proc_ID, &status, WNOHANG)); pid == proc_ID)
+        {
+            break;
+        }
+
+        // reroute stdin/out
+        if (piper.pipeInputs())
+        {
+            break;
+        }
+    }
+
+    SYSCALL(close(master_fd));
+
+    int status;
+    wait(&status);
+
+    if (WIFEXITED(status))
+    {
+        const int code = WEXITSTATUS(status);
+        std::cout << "Exited with code: " << code << std::endl;
+    }
+    else if (WIFSIGNALED(status))
+    {
+        const int code = WTERMSIG(status);
+        std::cout << "Killed by signal: " << code << std::endl;
+    }
+}
+
 void evalWithPTY(const std::string& input)
 {
     int master_fd;
@@ -30,48 +77,11 @@ void evalWithPTY(const std::string& input)
     }
     else if (proc_ID == 0)
     {
-        // establish the terminal state
-        temu::TerminalState state;
-        // child process
-        // we don't need the master fd, handle directly with stdin stdout
-        close(master_fd);
-        temu::runChildProcess(input);
+        child(master_fd, input);
     }
     else
     {
-        // parent process
-        temu::Piper piper(master_fd);
-        for (;;)
-        {
-            int status;
-            // see if the proc is done
-            if (const int pid = SYSCALL(waitpid(proc_ID, &status, WNOHANG)); pid == proc_ID)
-            {
-                break;
-            }
-
-            // reroute stdin/out
-            if (piper.pipeInputs())
-            {
-                break;
-            }
-        }
-
-        SYSCALL(close(master_fd));
-
-        int status;
-        wait(&status);
-
-        if (WIFEXITED(status))
-        {
-            const int code = WEXITSTATUS(status);
-            std::cout << "Exited with code: " << code << std::endl;
-        }
-        else if (WIFSIGNALED(status))
-        {
-            const int code = WTERMSIG(status);
-            std::cout << "Killed by signal: " << code << std::endl;
-        }
+        parent(master_fd, proc_ID);
     }
 }
 
