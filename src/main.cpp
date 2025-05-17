@@ -29,9 +29,9 @@ void parent(const int master_fd, const int proc_ID)
 {
     // parent process
     temu::Piper piper(master_fd);
+    int status;
     for (;;)
     {
-        int status;
         // see if the proc is done
         if (const int pid = SYSCALL(waitpid(proc_ID, &status, WNOHANG)); pid == proc_ID)
         {
@@ -46,19 +46,17 @@ void parent(const int master_fd, const int proc_ID)
     }
 
     SYSCALL(close(master_fd));
-
-    int status;
-    wait(&status);
-
     if (WIFEXITED(status))
     {
-        const int code = WEXITSTATUS(status);
-        std::cout << "Exited with code: " << code << std::endl;
+        std::cout << "Exited with code: " << WEXITSTATUS(status) << std::endl;
     }
     else if (WIFSIGNALED(status))
     {
-        const int code = WTERMSIG(status);
-        std::cout << "Killed by signal: " << code << std::endl;
+        std::cout << "Killed by signal: " << WTERMSIG(status) << std::endl;
+    }
+    else if (WIFSTOPPED(status))
+    {
+        std::cout << "Stopped by signal: " << WSTOPSIG(status) << std::endl;
     }
 }
 
@@ -148,20 +146,12 @@ void evalPiped(const std::vector<std::string>& input)
         waitpid(pid, &status, 0);
     }
 }
-bool should_exit = false, should_clear = false;
-
-int repl();
-
-void signalHandler(const int sig_num)
-{
-    std::cout << "Killed by interrupt." << std::endl;
-}
 
 int repl()
 {
-
     for (;;)
     {
+        bool should_exit = false, should_clear = false;
         char buf[PATH_MAX];
         if (getcwd(buf, PATH_MAX) == nullptr)
         {
