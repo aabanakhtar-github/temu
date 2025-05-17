@@ -85,6 +85,74 @@ void evalWithPTY(const std::string& input)
     }
 }
 
+void evalPiped(const std::vector<std::string>& input)
+{
+    int previous_read = -1;
+    std::vector<pid_t> pids;
+
+    for (std::size_t i = 0; i < input.size(); ++i)
+    {
+        int pipefd[2];
+
+        // Create pipe if not last command
+        if (i != input.size() - 1 && SYSCALL(pipe(pipefd)) < 0)
+        {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
+
+        pid_t pid = SYSCALL(fork());
+        if (pid < 0)
+        {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        }
+        else if (pid == 0)
+        {
+            // CHILD
+            if (previous_read != -1)
+            {
+                // rewire prev stdout into our stdin
+                redirect(previous_read, {STDIN_FILENO});
+                // unneeded anymore
+                SYSCALL(close(previous_read));
+            }
+
+            if (i != input.size() - 1)
+            {
+                SYSCALL(close(pipefd[PIPE_READ])); // close read end, since we are writing only
+                redirect(pipefd[PIPE_WRITE], {STDOUT_FILENO}); // rewire stdout to write end
+                SYSCALL(close(pipefd[PIPE_WRITE]));
+            }
+
+            temu::runChildProcess(input[i]);
+        }
+        else
+        {
+            // PARENT
+            pids.push_back(pid);
+            if (previous_read != -1)
+            {
+                // get rid of this fd
+                SYSCALL(close(previous_read));
+            }
+
+            if (i != input.size() - 1)
+            {
+                close(pipefd[PIPE_WRITE]); // close write end, we don't need it
+                previous_read = pipefd[0]; // next child reads from this
+            }
+        }
+    }
+    // wait for all the processes to exit
+    for (const pid_t pid : pids)
+    {
+        int status;
+        waitpid(pid, &status, 0);
+    }
+}
+
+
 int repl()
 {
     for (;;)
@@ -97,7 +165,7 @@ int repl()
             exit(EXIT_FAILURE);
         }
 
-        std::string prompt = (std::string("temu [")  + buf + "] % ");
+        std::string prompt = (std::string("temu [") + buf + "] % ");
         char* input = readline(prompt.c_str());
         if (input == nullptr)
         {
@@ -109,7 +177,11 @@ int repl()
         std::unique_ptr<char, decltype(free_str)> input_deleter(input, free_str);
         bool should_exit = false, should_clear = false;
 
-        if (!temu::interceptBuiltins(input, should_exit, should_clear))
+        if (auto redirections = splitString(input, '|'); redirections.size() > 1)
+        {
+            evalPiped(redirections);
+        }
+        else if (!temu::interceptBuiltins(input, should_exit, should_clear))
         {
             evalWithPTY(input);
         }

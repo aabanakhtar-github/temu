@@ -104,7 +104,7 @@ namespace temu
 
     void runChildProcess(const std::string& args)
     {
-        auto shell_command = "\bin\bash -c " + args;
+        auto shell_command = args;
         const auto input_vec = splitString(args, ' ');
         const auto argv = makeCArgs(input_vec);
         // run the app
