@@ -66,9 +66,6 @@ void evalWithPTY(const std::string& input)
 {
     int master_fd;
     int proc_ID = forkpty(&master_fd, nullptr, nullptr, nullptr);
-    // disabling echo mode prevents the pty from reprinting inputs (idk its their code)
-    // canonical mode is a feature that we dont need because we want to send input instantly (character buffered instead of line buffered)
-    // the slave side is still canonical
 
     if (proc_ID == -1)
     {
@@ -151,10 +148,18 @@ void evalPiped(const std::vector<std::string>& input)
         waitpid(pid, &status, 0);
     }
 }
+bool should_exit = false, should_clear = false;
 
+int repl();
+
+void signalHandler(const int sig_num)
+{
+    std::cout << "Killed by interrupt." << std::endl;
+}
 
 int repl()
 {
+
     for (;;)
     {
         char buf[PATH_MAX];
@@ -175,7 +180,6 @@ int repl()
         add_history(input);
         auto free_str = [](char* str) { free(str); };
         std::unique_ptr<char, decltype(free_str)> input_deleter(input, free_str);
-        bool should_exit = false, should_clear = false;
 
         if (auto redirections = splitString(input, '|'); redirections.size() > 1)
         {
@@ -198,6 +202,7 @@ int repl()
         }
     }
 }
+
 
 int main()
 {

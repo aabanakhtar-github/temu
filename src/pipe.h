@@ -9,20 +9,22 @@
 #include <vector>
 #include <unistd.h>
 
+#include "syscall.h"
+
 constexpr std::size_t PIPE_READ = 0;
 constexpr std::size_t PIPE_WRITE = 1;
 
 inline void closePipe(const int pipe[2])
 {
-    close(pipe[PIPE_READ]);
-    close(pipe[PIPE_WRITE]);
+    SYSCALL(close(pipe[PIPE_READ]));
+    SYSCALL(close(pipe[PIPE_WRITE]));
 }
 
 inline void redirect(const int pipe, const std::vector<int>& fds)
 {
     for (const auto fd : fds)
     {
-        dup2(pipe, fd);
+        SYSCALL(dup2(pipe, fd));
     }
 }
 

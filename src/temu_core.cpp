@@ -104,7 +104,7 @@ namespace temu
 
     void runChildProcess(const std::string& args)
     {
-        auto shell_command = args;
+        auto shell_command = "/bin/bash -c " + args;
         const auto input_vec = splitString(args, ' ');
         const auto argv = makeCArgs(input_vec);
         // run the app
@@ -123,18 +123,19 @@ namespace temu
             return true;
         }
         // check for emtpy string
-        auto copy = input;
-        if (copy.empty())
+        if (input.empty())
         {
             // nothing to parse
             return false;
         }
         // handle more complex builtins
-        auto argv = splitString(copy, ' ');
+        auto argv = splitString(input, ' ');
         std::for_each(argv.begin(), argv.end(), [&](auto& elem)
         {
             std::erase_if(elem, ::isspace);
         });
+
+        // go through some basic builtins
         if (argv[0] == "cd")
         {
             if (!(argv.size() == 2))

@@ -39,7 +39,7 @@ namespace temu
     };
 
     void runChildProcess(const std::string& args);
-    bool interceptBuiltins(const std::string& copy, bool& out_exit, bool& out_clear);
+    bool interceptBuiltins(const std::string& input, bool& out_exit, bool& out_clear);
 }
 
 #endif //TEMU_CORE_H
