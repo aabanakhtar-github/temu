@@ -13,9 +13,9 @@ add_executable(temu
         src/pipe.h
         src/temu_core.h
         src/temu_core.cpp
-        src/temu_runner.cpp
-        src/temu_runner.h
         src/syscall.h
+        src/temu_application.cpp
+        src/temu_application.h
 )
 
 target_link_libraries(temu readline)
