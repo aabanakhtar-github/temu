@@ -1,6 +1,6 @@
 # Temu - A  Terminal Emulator in C++
 
-**Temu** is a small terminal shell written in C++ that runs interactive programs using POSIX PTYs and supports basic command piping, built-ins, and signal handling.
+**Temu** is a small terminal shell written in C++ that runs interactive programs using POSIX PTYs and supports basic command piping, built-ins, and running your own applications. 
 
 ---
 ## Dependencies
@@ -14,7 +14,6 @@ You will need the ```readline``` package installed on your system
   temu [/home/user] %
   ```
 * Runs interactive programs like `cat`, `nano`, and `bash`
-* Handles Ctrl+C (SIGINT) without killing the shell
 * Supports pipelines like `ls | grep .cpp`
 * Built-in commands: `cd`, `exit`, `clear`
 * Remembers command history with arrow keys
