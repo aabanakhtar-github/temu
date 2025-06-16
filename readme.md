@@ -18,6 +18,9 @@ You will need the ```readline``` package installed on your system
 * Built-in commands: `cd`, `exit`, `clear`
 * Remembers command history with arrow keys
 
+## TODO:
+Ctrl+C handling.
+
 ---
 
 ## 🛠 How to Build
